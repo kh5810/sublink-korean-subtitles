@@ -4,6 +4,6 @@ services:
     name: sublink-korean-subtitles
     runtime: python
     plan: free
-    buildCommand: pip install -r requirements.txt
+   buildCommand: pip install -r requirements.txt && curl -fsSL https://deno.land/install.sh | sh
     startCommand: gunicorn app:app
     healthCheckPath: /health
