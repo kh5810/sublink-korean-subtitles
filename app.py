@@ -88,8 +88,13 @@ def subtitles():
             "subtitlesformat": "vtt/best",
             "outtmpl": os.path.join(tmp, "%(id)s.%(ext)s"),
             "quiet": True,
-            "no_warnings": True,
-            "ignoreerrors": True,
+            "no_warnings": False,
+            "ignoreerrors": False,
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["tv", "web_safari"]
+                }
+            },
         }
         try:
             with yt_dlp.YoutubeDL(options) as ydl:
