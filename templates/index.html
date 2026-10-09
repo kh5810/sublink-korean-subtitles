@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="referrer-policy" content="strict-origin-when-cross-origin">
+<title>SubLink — 해외 영상 한글 자막</title>
+<style>
+:root{color-scheme:dark;--bg:#080d17;--panel:#111b2b;--line:#263650;--blue:#398cff;--muted:#aab8d0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#14233b 0,#080d17 55%);color:#f4f7ff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:18px 5%;border-bottom:1px solid #24324a;display:flex;align-items:center;gap:12px}
+.logo{font-size:26px;font-weight:800;letter-spacing:-.8px}.logo span{color:#5ba0ff}.tag{color:#b7c5dc;font-size:14px}
+main{max-width:1200px;margin:34px auto;padding:0 18px}
+h1{text-align:center;font-size:clamp(26px,4vw,42px);margin:0 0 10px}.intro{text-align:center;color:#bdc9dd;line-height:1.7;margin:0 auto 28px}
+.layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.9fr);gap:18px}
+.panel{background:rgba(17,27,43,.94);border:1px solid var(--line);border-radius:16px;padding:18px;min-width:0}
+#playerWrap{position:relative;width:100%;aspect-ratio:16/9;background:#02050a;border-radius:10px;overflow:hidden}
+#player{position:absolute;inset:0;width:100%;height:100%}
+#subtitleOverlay{position:absolute;z-index:4;left:4%;right:4%;bottom:8%;text-align:center;pointer-events:none;font-size:25px;font-weight:750;line-height:1.45;color:white;text-shadow:0 2px 3px #000,2px 0 3px #000,-2px 0 3px #000;background:rgba(0,0,0,.24);white-space:pre-wrap}
+label{display:block;font-weight:650;margin:12px 0 7px}input,select,button{font:inherit;border-radius:9px;border:1px solid #344866;background:#0b1423;color:#f4f7ff;padding:12px;width:100%}
+button{background:var(--blue);border:0;font-weight:750;cursor:pointer;margin-top:10px}button:disabled{opacity:.55;cursor:wait}.secondary{background:#263650}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.hint{font-size:12px;color:var(--muted);line-height:1.6}.status{margin-top:12px;padding:11px 12px;border-radius:9px;background:#0b1423;color:#b9c9df;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.status.error{color:#ffb7b7}.status.ok{color:#79e8ce}
+#cueList{margin-top:14px;max-height:230px;overflow:auto;font-size:13px;color:#c5d2e6}.cue{padding:7px;border-bottom:1px solid #263650;cursor:pointer}.cue:hover{background:#1a2a42}
+footer{text-align:center;color:#8394af;font-size:12px;padding:24px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.tag{display:none}main{margin-top:24px}}
+</style>
+</head>
+<body>
+<header><div class="logo"><span>▶</span> SubLink</div><div class="tag">해외 영상, 자연스러운 한글 자막과 함께</div></header>
+<main>
+<h1>링크를 넣고, <span style="color:#5ba0ff">한글 자막</span>으로 보기</h1>
+<p class="intro">유튜브 자막을 가져와 한국어로 번역하거나, SRT/VTT 자막 파일을 올려 영상과 함께 볼 수 있어요.<br>무료 번역 서비스는 사용량 제한이 있을 수 있습니다.</p>
+<div class="layout">
+<section class="panel">
+<div id="playerWrap"><div id="player"></div><div id="subtitleOverlay">여기에 한국어 자막이 표시됩니다</div></div>
+<div class="row">
+<div><label for="fontSize">자막 크기</label><select id="fontSize"><option value="20">작게</option><option value="25" selected>보통</option><option value="32">크게</option><option value="40">매우 크게</option></select></div>
+<div><label for="position">자막 위치</label><select id="position"><option value="8%" selected>아래</option><option value="25%">중간 아래</option><option value="42%">중앙</option></select></div>
+</div>
+<div id="cueList"></div>
+</section>
+<aside class="panel">
+<label for="videoUrl">🔗 유튜브 링크</label>
+<input id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." autocomplete="url">
+<button id="loadBtn" onclick="loadVideo()">영상 열기 + 자막 가져오기</button>
+<div class="hint">영상에 자막이 있어야 자동으로 가져올 수 있습니다. 비공개·연령 제한·접근 제한 영상은 지원되지 않을 수 있어요.</div>
+<label for="subtitleFile">📄 자막 파일 직접 올리기 (대안)</label>
+<input id="subtitleFile" type="file" accept=".srt,.vtt,text/vtt,application/x-subrip">
+<div class="row">
+<div><label for="sourceLang">원본 자막 언어</label><select id="sourceLang"><option value="auto">자동 감지</option><option value="en">영어</option><option value="ja">일본어</option><option value="zh">중국어</option><option value="fr">프랑스어</option><option value="de">독일어</option><option value="es">스페인어</option><option value="it">이탈리아어</option><option value="pt">포르투갈어</option><option value="ru">러시아어</option></select></div>
+<div><label for="subtitleStyle">자막 스타일</label><select id="subtitleStyle"><option value="shadow">검은 테두리</option><option value="box">검은 배경</option></select></div>
+</div>
+<button id="translateBtn" class="secondary" onclick="translateCues()" disabled>한국어로 번역하기</button>
+<div id="status" class="status">먼저 유튜브 링크를 열거나 SRT/VTT 파일을 올려 주세요.</div>
+<p class="hint">참고: 이 사이트는 유튜브 영상 자체를 다운로드하지 않습니다. 영상 재생은 유튜브 플레이어를 사용하며, 자막을 가져오지 못하면 자막 파일 업로드를 이용하세요.</p>
+</aside>
+</div>
+</main>
+<footer>SubLink · 개인용 프로토타입 · 번역 품질과 이용 가능 여부는 자막 및 외부 서비스에 따라 달라질 수 있습니다.</footer>
+<script>
+let player = null, cues = [], translatedCues = [], currentVideoId = null;
+const statusEl = document.getElementById("status");
+function status(message, type=""){statusEl.textContent=message;statusEl.className="status "+type;}
+function videoIdFromUrl(url){
+  try{
+    const u=new URL(url);
+    if(u.hostname==="youtu.be") return u.pathname.slice(1).split("/")[0];
+    if(u.hostname.endsWith("youtube.com")){
+      if(u.pathname==="/watch") return u.searchParams.get("v");
+      const m=u.pathname.match(/^\/(shorts|embed)\/([^/?]+)/); if(m)return m[2];
+    }
+  }catch(e){}
+  return null;
+}
+function makePlayer(id){
+ const host = document.getElementById("player");
+ if (player && player.loadVideoById) {
+   player.loadVideoById(id);
+   return;
+ }
+ player = new YT.Player("player", {
+   videoId: id,
+   host: "https://www.youtube.com",
+   playerVars: {
+     playsinline: 1,
+     rel: 0,
+     origin: window.location.origin,
+     widget_referrer: window.location.href
+   },
+   events: {
+     onReady: (event) => {
+       // YouTube Error 153 can occur if the embed request has no Referer.
+       // Keep the normal site origin and explicitly set a safe referrer policy.
+       try {
+         const iframe = event.target.getIframe();
+         iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+         iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+         iframe.setAttribute("title", "YouTube video player");
+       } catch (_) {}
+     },
+     onError: (event) => {
+       const messages = {
+         2: "유튜브 링크나 영상 ID가 올바르지 않습니다.",
+         5: "이 영상은 HTML5 플레이어에서 재생할 수 없습니다.",
+         100: "영상이 삭제되었거나 비공개입니다.",
+         101: "영상 소유자가 외부 사이트 재생을 허용하지 않았습니다.",
+         150: "영상 소유자가 외부 사이트 재생을 허용하지 않았습니다.",
+         153: "유튜브가 플레이어 요청의 출처를 확인하지 못했습니다. localhost 주소로 접속 중인지 확인하고 광고 차단/개인정보 보호 확장 기능을 잠시 꺼서 다시 시도해 주세요."
+       };
+       status(messages[event.data] || ("유튜브 플레이어 오류: " + event.data), "error");
+     }
+   }
+ });
+}
+function initPlayer(id){
+ currentVideoId=id;
+ if(window.YT && window.YT.Player){makePlayer(id);return;}
+ window.pendingVideoId=id;
+}
+window.onYouTubeIframeAPIReady=function(){
+ if(window.pendingVideoId) makePlayer(window.pendingVideoId);
+};
+(function(){let s=document.createElement("script");s.src="https://www.youtube.com/iframe_api";document.head.appendChild(s);})();
+async function loadVideo(){
+ const url=document.getElementById("videoUrl").value.trim(), id=videoIdFromUrl(url);
+ if(!id){status("올바른 유튜브 링크를 입력해 주세요.","error");return;}
+ initPlayer(id); status("영상은 열었습니다. 자막을 가져오는 중…");
+ const btn=document.getElementById("loadBtn");btn.disabled=true;
+ try{
+  const res=await fetch("/api/subtitles",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})});
+  const data=await res.json(); if(!res.ok)throw new Error(data.error||"자막을 가져오지 못했습니다.");
+  cues=data.cues; translatedCues=[]; document.getElementById("translateBtn").disabled=false;
+  status(`영상: ${data.title}\n자막 ${cues.length}개를 가져왔습니다. ‘한국어로 번역하기’를 눌러 주세요.`,"ok");renderCueList(cues);
+ }catch(e){
+  cues=[];document.getElementById("translateBtn").disabled=true;
+  const msg = (e instanceof TypeError && /fetch/i.test(e.message))
+    ? "로컬 자막 서버에 연결되지 않았습니다. 주소창이 http://127.0.0.1:5000 인지 확인하고, 검은 명령 프롬프트 창에서 py app.py가 계속 실행 중인지 확인해 주세요. HTML 파일을 더블클릭해서 열면 작동하지 않습니다."
+    : e.message;
+  status(msg,"error");
+ }
+ finally{btn.disabled=false;}
+}
+document.getElementById("subtitleFile").addEventListener("change",async e=>{
+ const file=e.target.files[0];if(!file)return;
+ const form=new FormData();form.append("subtitle",file);status("자막 파일을 읽는 중…");
+ try{const res=await fetch("/api/upload",{method:"POST",body:form});const data=await res.json();if(!res.ok)throw new Error(data.error||"파일을 읽지 못했습니다.");cues=data.cues;translatedCues=[];document.getElementById("translateBtn").disabled=false;status(`${data.filename}: 자막 ${cues.length}개를 읽었습니다. ‘한국어로 번역하기’를 눌러 주세요.`,"ok");renderCueList(cues);}
+ catch(err){
+  const msg = (err instanceof TypeError && /fetch/i.test(err.message))
+    ? "로컬 서버에 연결되지 않았습니다. 검은 명령 프롬프트 창에서 `py app.py`가 실행 중인지 확인해 주세요."
+    : err.message;
+  status(msg,"error");
+ }
+});
+async function translateCues(){
+ if(!cues.length)return;
+ const btn=document.getElementById("translateBtn");btn.disabled=true;status(`한국어로 번역 중… (${cues.length}개)\n자막이 많으면 시간이 걸릴 수 있습니다.`);
+ try{
+  // Translate one cue per request to stay compatible with simple free translation servers.
+  const result=[];
+  for(let i=0;i<cues.length;i++){
+   const res=await fetch("/api/translate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cues:[cues[i]],source:document.getElementById("sourceLang").value})});
+   const data=await res.json();if(!res.ok)throw new Error(data.error||"번역 오류");
+   result.push(data.cues[0]);
+   if(i%10===0||i===cues.length-1)status(`한국어로 번역 중… ${i+1}/${cues.length}`);
+  }
+  translatedCues=result;renderCueList(translatedCues);status(`번역 완료! 한국어 자막 ${result.length}개를 준비했습니다. 영상을 재생해 보세요.`,"ok");
+ }catch(e){
+  const msg = (e instanceof TypeError && /fetch/i.test(e.message))
+    ? "사이트 서버에 연결되지 않았습니다. 주소창이 http://127.0.0.1:5000 인지 확인하고, 검은 명령 프롬프트 창에서 py app.py가 계속 실행 중인지 확인해 주세요."
+    : e.message;
+  status(msg,"error");
+ }
+ finally{btn.disabled=false;}
+}
+function timeToSeconds(t){const p=t.replace(",",".").split(":").map(Number);if(p.length===3)return p[0]*3600+p[1]*60+p[2];if(p.length===2)return p[0]*60+p[1];return Number(t)||0;}
+function renderCueList(list){
+ const box=document.getElementById("cueList");box.innerHTML="";
+ list.slice(0,250).forEach(c=>{const div=document.createElement("div");div.className="cue";div.textContent=`${c.start}  ${c.text}`;div.onclick=()=>{if(player&&player.seekTo)player.seekTo(timeToSeconds(c.start),true);};box.appendChild(div);});
+}
+function updateSubtitle(){
+ if(!player||!player.getCurrentTime)return;
+ const list=translatedCues.length?translatedCues:cues;
+ const now=player.getCurrentTime();const c=list.find(x=>now>=timeToSeconds(x.start)&&now<timeToSeconds(x.end));
+ const overlay=document.getElementById("subtitleOverlay");
+ overlay.textContent=c?c.text:(translatedCues.length?"":"자막을 번역하면 여기에 표시됩니다");
+ overlay.style.fontSize=document.getElementById("fontSize").value+"px";
+ overlay.style.bottom=document.getElementById("position").value;
+ overlay.style.background=document.getElementById("subtitleStyle").value==="box"?"rgba(0,0,0,.72)":"rgba(0,0,0,.24)";
+}
+setInterval(updateSubtitle,200);
+</script>
+</body>
+</html>
+
